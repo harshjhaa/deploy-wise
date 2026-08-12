@@ -1,0 +1,101 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String?
+  email        String   @unique
+  passwordHash String
+  role         String   @default("USER")
+  status       String?  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  lastLoginAt  DateTime?
+
+  reservationsCreated Reservation[] @relation("createdBy")
+}
+
+model Environment {
+  id                  String   @id @default(uuid())
+  name                String   @unique
+  description         String?
+  isActive            Boolean  @default(true)
+  reservationEnabled  Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  reservations Reservation[]
+}
+
+model Game {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  reservations Reservation[]
+}
+
+model Reservation {
+  id             String   @id @default(uuid())
+  environment    Environment @relation(fields: [environmentId], references: [id])
+  environmentId  String
+  game           Game @relation(fields: [gameId], references: [id])
+  gameId         String
+  createdById    String
+  createdBy      User @relation("createdBy", fields: [createdById], references: [id])
+  currentOwnerId String
+  status         String
+  reservedAt     DateTime @default(now())
+  expiresAt      DateTime
+  releasedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  pocs ReservationPOC[]
+  events ReservationEvent[]
+  handoverTokens HandoverToken[]
+
+  @@index([environmentId, gameId])
+}
+
+model ReservationPOC {
+  id            String   @id @default(uuid())
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  reservationId String
+  userId        String
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+}
+
+model ReservationEvent {
+  id             String   @id @default(uuid())
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  reservationId  String
+  eventType      String
+  performedBy    String
+  fromUserId     String?
+  toUserId       String?
+  oldExpiresAt   DateTime?
+  newExpiresAt   DateTime?
+  metadata       Json?
+  createdAt      DateTime @default(now())
+}
+
+model HandoverToken {
+  id            String   @id @default(uuid())
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  reservationId String
+  tokenHash     String   @unique
+  createdBy     String
+  expiresAt     DateTime?
+  usedAt        DateTime?
+  createdAt     DateTime @default(now())
+}
