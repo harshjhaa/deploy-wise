@@ -2,6 +2,9 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health';
+import environmentsRouter from './routes/environments';
+import gamesRouter from './routes/games';
+import reservationsRouter from './routes/reservations';
 
 const app = express();
 
@@ -24,7 +27,11 @@ app.use(
 app.use(express.json());
 app.use(cookieParser());
 
+//Register routes
 app.use('/health', healthRouter);
+app.use('/api/v1/environments', environmentsRouter);
+app.use('/api/v1/games', gamesRouter);
+app.use('/api/v1/reservations', reservationsRouter);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   // simple centralized error handler
