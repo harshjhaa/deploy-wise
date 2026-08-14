@@ -54,6 +54,32 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+router.get('/', async (req, res, next) => {
+  try {
+    const { environmentId, gameId, status, limit, offset } = req.query as any;
+
+    const where: any = {};
+    if (environmentId) where.environmentId = environmentId;
+    if (gameId) where.gameId = gameId;
+    if (status) where.status = status;
+
+    const take = limit ? parseInt(limit, 10) : 100;
+    const skip = offset ? parseInt(offset, 10) : 0;
+
+    const reservations = await prisma.reservation.findMany({
+      where,
+      include: { pocs: true, events: true },
+      orderBy: { createdAt: 'desc' },
+      take,
+      skip,
+    });
+
+    res.json(reservations);
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post('/:id/release', async (req, res, next) => {
   try {
     const result = await prisma.$transaction(async (tx) => {
