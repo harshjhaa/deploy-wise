@@ -120,8 +120,8 @@ router.get('/', async (req, res, next) => {
     if (gameId) where.gameId = gameId;
     if (status) where.status = status;
 
-    const take = limit ? parseInt(limit, 10) : 100;
-    const skip = offset ? parseInt(offset, 10) : 0;
+    const take = limit ? Number.parseInt(limit, 10) : 100;
+    const skip = offset ? Number.parseInt(offset, 10) : 0;
 
     const reservations = await prisma.reservation.findMany({
       where,
@@ -200,25 +200,80 @@ router.post('/:id/extend', async (req, res, next) => {
 // Handover ownership
 router.post('/:id/handover', async (req, res, next) => {
   try {
-    const { toUserId, performedById } = req.body as any;
+    const { toUserId, performedById, pocs } = req.body as any;
     if (missingBodyFields(req.body, ['toUserId', 'performedById']).length > 0) {
       return res.status(400).json({ error: 'toUserId and performedById are required to hand over a reservation' });
     }
+    if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
+      return res.status(400).json({ error: 'Handover requires 1 primary and 1-2 secondary POCs' });
+    }
 
+    // Validate POCs
+    const newPocs: Array<{ userId: string; isPrimary: boolean }> = pocs;
+    if (newPocs.some((p) => !p || typeof p.userId !== 'string' || typeof p.isPrimary !== 'boolean')) {
+      return res.status(400).json({ error: 'Each POC must include userId and isPrimary' });
+    }
+
+    // Ensure exactly one primary POC and 1-2 secondary POCs
+    const newPocUserIds = newPocs.map((p) => p.userId);
+    if (new Set(newPocUserIds).size !== newPocUserIds.length) {
+      return res.status(400).json({ error: 'A user cannot be selected more than once for the handover' });
+    }
+
+    // Validate that there is exactly 1 primary and 1-2 secondary POCs
+    const primaryCount = newPocs.filter((p) => p.isPrimary).length;
+    const secondaryCount = newPocs.length - primaryCount;
+    if (primaryCount !== 1 || secondaryCount < 1 || secondaryCount > 2) {
+      return res.status(400).json({ error: 'Handover requires exactly 1 primary and 1-2 secondary POCs' });
+    }
+    // Ensure the new owner is one of the new POCs
+    if (!newPocUserIds.includes(toUserId)) {
+      return res.status(400).json({ error: 'The new owner must be one of the new POCs' });
+    }
+
+    // Validate that all user IDs exist in the database
     const result = await prisma.$transaction(async (tx) => {
       const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'handed over');
+      const reservationWithPocs = await findReservationById(tx, req.params.id, { pocs: true });
+      if (!reservationWithPocs) throw httpError('Reservation not found', 404);
 
-      const targetUser = await tx.user.findUnique({ where: { id: toUserId }, select: { id: true } });
-      if (!targetUser) throw httpError('Target user not found', 400);
+      const users = await tx.user.findMany({
+        where: { id: { in: [...new Set([...newPocUserIds, toUserId])] } },
+        select: { id: true },
+      });
+      if (users.length !== new Set([...newPocUserIds, toUserId]).size) {
+        throw httpError('One or more new POC users do not exist', 400);
+      }
 
       const fromUserId = reservation.currentOwnerId;
+      const previousPocUserIds = reservationWithPocs.pocs.map((poc) => poc.userId);
 
-      return updateReservationWithEvent(
+      // Update reservation with new owner and create handover event
+      const updated = await updateReservationWithEvent(
         tx,
         req.params.id,
         { currentOwnerId: toUserId },
-        { eventType: 'HANDOVER', performedBy: performedById, fromUserId, toUserId },
+        {
+          eventType: 'HANDOVER',
+          performedBy: performedById,
+          fromUserId,
+          toUserId,
+          metadata: { previousPocUserIds, newPocUserIds },
+        },
       );
+
+      // Update POCs: delete existing POCs and create new ones
+      await tx.reservationPOC.deleteMany({ where: { reservationId: reservation.id } });
+      await tx.reservationPOC.createMany({
+        data: newPocs.map((poc) => ({
+          reservationId: reservation.id,
+          userId: poc.userId,
+          isPrimary: poc.isPrimary,
+        })),
+      });
+
+      // Return the updated reservation with POCs and events included
+      return findReservationById(tx, updated.id, { pocs: true, events: true });
     });
 
     res.json(result);
