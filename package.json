@@ -11,6 +11,7 @@
     "dev:web": "npm --workspace=apps/web run dev"
   },
   "devDependencies": {
+    "@types/node": "^26.2.0",
     "prisma": "^5.22.0"
   },
   "dependencies": {

@@ -30,7 +30,6 @@ model Environment {
   name                String   @unique
   description         String?
   isActive            Boolean  @default(true)
-  isReserved          Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

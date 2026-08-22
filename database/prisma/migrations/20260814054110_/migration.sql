@@ -5,5 +5,4 @@
 
 */
 -- AlterTable
-ALTER TABLE "Environment" DROP COLUMN "reservationEnabled",
-ADD COLUMN     "isReserved" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "Environment" DROP COLUMN "reservationEnabled";
