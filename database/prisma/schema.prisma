@@ -13,7 +13,6 @@ model User {
   email        String   @unique
   passwordHash String
   role         String   @default("USER")
-  status       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   lastLoginAt  DateTime?
