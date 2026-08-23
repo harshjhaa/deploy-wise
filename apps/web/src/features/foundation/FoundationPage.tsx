@@ -1,12 +1,26 @@
+import { useState } from "react";
 import { AsyncState } from "../../components/feedback/AsyncState";
 import { DashboardToolbar } from "../dashboard/components/DashboardToolbar";
 import { EnvironmentSection } from "../dashboard/components/EnvironmentSection";
-import { useDashboardData } from "../dashboard/dashboard.hooks";
+import {
+  useCreateReservation,
+  useDashboardData,
+} from "../dashboard/dashboard.hooks";
+import {
+  DashboardEnvironment,
+  DashboardGame,
+} from "../dashboard/dashboard.types";
+import { ReserveModal } from "../dashboard/components/ReserveModal";
 import { useDashboardStore } from "../../store/dashboardStore";
 import "../dashboard/DashboardPage.scss";
 
 export function FoundationPage() {
   const { data, isLoading, error, isFetching, refetch } = useDashboardData();
+  const createReservation = useCreateReservation();
+  const [selectedResource, setSelectedResource] = useState<{
+    environment: DashboardEnvironment;
+    game: DashboardGame;
+  } | null>(null);
   const search = useDashboardStore((state) => state.search).toLowerCase();
   const availability = useDashboardStore((state) => state.availability);
   const environments =
@@ -69,9 +83,44 @@ export function FoundationPage() {
             key={environment.id}
             environment={environment}
             games={data?.games ?? []}
+            onReserve={(selectedEnvironment, selectedGame) =>
+              setSelectedResource({
+                environment: selectedEnvironment,
+                game: selectedGame,
+              })
+            }
           />
         ))}
       </section>
+      {selectedResource && data && (
+        <ReserveModal
+          environmentId={selectedResource.environment.id}
+          environmentName={selectedResource.environment.name}
+          game={selectedResource.game}
+          users={data.users}
+          onClose={() => {
+            setSelectedResource(null);
+            createReservation.reset();
+          }}
+          isSubmitting={createReservation.isPending}
+          error={
+            createReservation.error instanceof Error
+              ? createReservation.error.message
+              : ""
+          }
+          onSubmit={(values) =>
+            createReservation.mutate(
+              {
+                environmentId: selectedResource.environment.id,
+                gameId: selectedResource.game.id,
+                createdById: values.currentOwnerId,
+                ...values,
+              },
+              { onSuccess: () => setSelectedResource(null) },
+            )
+          }
+        />
+      )}
       {/* Foundation resource status remains available through the API layer for later profile/admin surfaces. */}
       <section
         className="status-panel dashboard-footer"

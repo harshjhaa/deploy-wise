@@ -4,6 +4,12 @@ export type DashboardGame = {
   isActive: boolean;
 };
 
+export type DashboardUser = {
+  id: string;
+  name: string | null;
+  email: string;
+};
+
 export type DashboardReservation = {
   id: string;
   gameId: string;
@@ -23,4 +29,5 @@ export type DashboardEnvironment = {
 export type DashboardData = {
   environments: DashboardEnvironment[];
   games: DashboardGame[];
+  users: DashboardUser[];
 };

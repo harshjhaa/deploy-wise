@@ -3,6 +3,7 @@ import { DashboardGame, DashboardReservation } from "../dashboard.types";
 type GameReservationCardProps = Readonly<{
   game: DashboardGame;
   reservation?: DashboardReservation;
+  onReserve: (game: DashboardGame) => void;
 }>;
 
 function formatExpiry(expiresAt: string) {
@@ -16,6 +17,7 @@ function formatExpiry(expiresAt: string) {
 export function GameReservationCard({
   game,
   reservation,
+  onReserve,
 }: GameReservationCardProps) {
   const isReserved = Boolean(reservation);
 
@@ -38,7 +40,9 @@ export function GameReservationCard({
       ) : (
         <div className="available-summary">
           <span>Ready for a reservation</span>
-          <button type="button">Reserve</button>
+          <button type="button" onClick={() => onReserve(game)}>
+            Reserve
+          </button>
         </div>
       )}
     </article>

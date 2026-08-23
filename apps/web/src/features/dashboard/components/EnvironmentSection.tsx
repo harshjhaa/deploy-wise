@@ -4,11 +4,13 @@ import { GameReservationCard } from "./GameReservationCard";
 type EnvironmentSectionProps = Readonly<{
   environment: DashboardEnvironment;
   games: DashboardGame[];
+  onReserve: (environment: DashboardEnvironment, game: DashboardGame) => void;
 }>;
 
 export function EnvironmentSection({
   environment,
   games,
+  onReserve,
 }: EnvironmentSectionProps) {
   return (
     <section
@@ -34,6 +36,7 @@ export function EnvironmentSection({
               reservation={environment.reservations.find(
                 (item) => item.gameId === game.id,
               )}
+              onReserve={() => onReserve(environment, game)}
             />
           ))}
       </div>
