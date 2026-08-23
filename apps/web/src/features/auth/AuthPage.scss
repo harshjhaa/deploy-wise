@@ -1,0 +1,127 @@
+.auth-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(360px, 0.9fr);
+  min-height: 100vh;
+}
+.auth-brand-panel {
+  background: #d6f36b;
+  color: #18231f;
+  display: flex;
+  flex-direction: column;
+  padding: 42px clamp(28px, 6vw, 88px);
+}
+.auth-brand-panel .brand {
+  color: #18231f;
+}
+.auth-message {
+  margin: auto 0;
+  max-width: 560px;
+}
+.auth-message h1 {
+  color: #18231f;
+  font-size: clamp(38px, 5vw, 70px);
+}
+.auth-message p:last-child {
+  font-size: 17px;
+  line-height: 1.7;
+  max-width: 480px;
+}
+.auth-panel-index {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+}
+.auth-form-panel {
+  align-items: center;
+  background: #10191d;
+  display: flex;
+  justify-content: center;
+  padding: 48px 28px;
+}
+.auth-card {
+  max-width: 390px;
+  width: 100%;
+}
+.auth-card h2 {
+  color: #f0f3ee;
+  font-size: 34px;
+  margin: 0;
+}
+.auth-subtitle {
+  color: #9aacb0;
+  line-height: 1.6;
+  margin: 12px 0 30px;
+}
+.auth-form {
+  display: grid;
+  gap: 18px;
+}
+.auth-field {
+  display: grid;
+  gap: 8px;
+}
+.auth-field span {
+  color: #aab9bb;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+}
+.auth-field input {
+  background: #172428;
+  border: 1px solid #385055;
+  color: #edf4ed;
+  font: inherit;
+  outline: none;
+  padding: 13px 14px;
+  width: 100%;
+}
+.auth-field input:focus {
+  border-color: #d6f36b;
+}
+.auth-submit {
+  background: #d6f36b;
+  border: 0;
+  color: #18231f;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 14px;
+}
+.auth-submit:hover {
+  background: #c7e258;
+}
+.auth-error {
+  background: #3a272a;
+  color: #f09e9e;
+  font-size: 13px;
+  padding: 12px;
+}
+.auth-switch {
+  color: #9aacb0;
+  font-size: 14px;
+  margin-top: 24px;
+}
+.auth-switch a {
+  color: #d6f36b;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .auth-layout {
+    grid-template-columns: 1fr;
+  }
+  .auth-brand-panel {
+    min-height: 280px;
+    padding: 28px 24px;
+  }
+  .auth-message {
+    margin: 46px 0 28px;
+  }
+  .auth-message h1 {
+    font-size: 42px;
+  }
+  .auth-message p:last-child {
+    display: none;
+  }
+}

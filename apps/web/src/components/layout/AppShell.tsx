@@ -1,5 +1,5 @@
 import { PropsWithChildren } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import "./AppShell.scss";
 
 export function AppShell({ children }: Readonly<PropsWithChildren>) {
@@ -26,7 +26,7 @@ export function AppShell({ children }: Readonly<PropsWithChildren>) {
         </nav>
         <span className="environment-label">LOCAL / PHASE 1</span>
       </header>
-      {children}
+      {children ?? <Outlet />}
     </div>
   );
 }
