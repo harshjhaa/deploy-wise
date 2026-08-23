@@ -1,0 +1,19 @@
+.profile-page {
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 80px clamp(20px, 5vw, 76px);
+}
+
+.profile-copy {
+  color: #9aacb0;
+  font-size: 16px;
+  line-height: 1.7;
+  margin-top: 22px;
+  max-width: 560px;
+}
+
+@media (max-width: 640px) {
+  .profile-page {
+    padding-top: 56px;
+  }
+}
