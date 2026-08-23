@@ -29,7 +29,6 @@ router.get('/', async (req, res, next) => {
       name: environment.name,
       description: environment.description,
       isActive: environment.isActive,
-      isReserved: environment.isReserved,
       reservations: environment.reservations.map((reservation) => ({
         id: reservation.id,
         gameId: reservation.gameId,

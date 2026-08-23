@@ -1,13 +1,63 @@
 import { Router } from 'express';
 import prisma from '../prismaClient';
+import {
+  createReservationEvent,
+  findReservationById,
+  findActiveReservationForPoc,
+  httpError,
+  missingBodyFields,
+  updateReservationWithEvent,
+} from './reservations.utils';
 
 const router = Router();
 
+
+// Create a new reservation
 router.post('/', async (req, res, next) => {
   try {
-    const { environmentId, gameId, currentOwnerId, expiresAt } = req.body;
-    if (!environmentId || !gameId || !currentOwnerId || !expiresAt) {
+    const { environmentId, gameId, currentOwnerId, expiresAt, createdById, pocs } = req.body as any;
+    if (missingBodyFields(req.body, ['environmentId', 'gameId', 'currentOwnerId', 'expiresAt']).length > 0) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // If createdById is not provided, default to currentOwnerId
+    const creatorId = createdById || currentOwnerId;
+    if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
+      return res.status(400).json({ error: 'Reservation requires 1 primary and 1-2 secondary POCs' });
+    }
+
+    // Validate POCs
+    const pocsInput: Array<{ userId: string; isPrimary: boolean }> = pocs;
+    if (pocsInput.some((p) => !p || typeof p.userId !== 'string' || typeof p.isPrimary !== 'boolean')) {
+      return res.status(400).json({ error: 'Each POC must include userId and isPrimary' });
+    }
+
+    // Ensure exactly one primary POC
+    const userIds = pocsInput.map((p) => p.userId);
+    if (new Set(userIds).size !== userIds.length) {
+      return res.status(400).json({ error: 'A user cannot be selected more than once for the same reservation' });
+    }
+
+    // Validate that there is exactly 1 primary and 1-2 secondary POCs
+    const primaryCount = pocsInput.filter((p) => p.isPrimary).length;
+    const secondaryCount = pocsInput.length - primaryCount;
+    if (primaryCount !== 1 || secondaryCount < 1 || secondaryCount > 2) {
+      return res.status(400).json({ error: 'Reservation requires exactly 1 primary and 1-2 secondary POCs' });
+    }
+
+    // Check for existing active reservation for the same environment and game
+    const activeReservation = await prisma.reservation.findFirst({
+      where: { environmentId, gameId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (activeReservation) {
+      return res.status(409).json({ error: 'An active reservation already exists for this environment and game' });
+    }
+
+    // Validate that all user IDs exist in the database
+    const users = await prisma.user.findMany({ where: { id: { in: [...new Set([...userIds, creatorId, currentOwnerId])] } }, select: { id: true } });
+    if (users.length !== new Set([...userIds, creatorId, currentOwnerId]).size) {
+      return res.status(400).json({ error: 'One or more selected users do not exist' });
     }
 
     const reservation = await prisma.$transaction(async (tx) => {
@@ -15,19 +65,27 @@ router.post('/', async (req, res, next) => {
         data: {
           environmentId,
           gameId,
-          createdById: currentOwnerId,
+          createdById: creatorId,
           currentOwnerId,
           status: 'ACTIVE',
           expiresAt: new Date(expiresAt),
         },
       });
 
-      await tx.environment.update({
-        where: { id: environmentId },
-        data: { isReserved: true },
+      // create POCs
+      await tx.reservationPOC.createMany({
+        data: pocsInput.map((p) => ({ reservationId: r.id, userId: p.userId, isPrimary: p.isPrimary })),
       });
 
-      return r;
+      // record event for creation
+      await createReservationEvent(tx, {
+        reservationId: r.id,
+        eventType: 'CREATED',
+        performedBy: creatorId,
+      });
+
+      // return the reservation with POCs and events included
+      return findReservationById(tx, r.id, { pocs: true, events: true });
     });
 
     res.status(201).json(reservation);
@@ -39,12 +97,10 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+// Get reservation by ID
 router.get('/:id', async (req, res, next) => {
   try {
-    const reservation = await prisma.reservation.findUnique({
-      where: { id: req.params.id },
-      include: { pocs: true, events: true },
-    });
+    const reservation = await findReservationById(prisma, req.params.id, { pocs: true, events: true });
     if (!reservation) {
       return res.status(404).json({ error: 'Reservation not found' });
     }
@@ -54,30 +110,170 @@ router.get('/:id', async (req, res, next) => {
   }
 });
 
+// List reservations with optional filters
+router.get('/', async (req, res, next) => {
+  try {
+    const { environmentId, gameId, status, limit, offset } = req.query as any;
+
+    const where: any = {};
+    if (environmentId) where.environmentId = environmentId;
+    if (gameId) where.gameId = gameId;
+    if (status) where.status = status;
+
+    const take = limit ? Number.parseInt(limit, 10) : 100;
+    const skip = offset ? Number.parseInt(offset, 10) : 0;
+
+    const reservations = await prisma.reservation.findMany({
+      where,
+      include: { pocs: true, events: true },
+      orderBy: { createdAt: 'desc' },
+      take,
+      skip,
+    });
+
+    res.json(reservations);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Release a reservation
 router.post('/:id/release', async (req, res, next) => {
   try {
+    const { performedById } = req.body as any;
+    if (missingBodyFields(req.body, ['performedById']).length > 0) {
+      return res.status(400).json({ error: 'performedById is required to release a reservation' });
+    }
+
     const result = await prisma.$transaction(async (tx) => {
-      const reservation = await tx.reservation.update({
-        where: { id: req.params.id },
-        data: {
-          status: 'RELEASED',
-          releasedAt: new Date(),
-        },
-      });
+      await findActiveReservationForPoc(tx, req.params.id, performedById, 'released');
 
-      // If there are no other active reservations for this environment, mark it unreserved
-      const activeCount = await tx.reservation.count({
-        where: { environmentId: reservation.environmentId, status: 'ACTIVE' },
-      });
-
-      if (activeCount === 0) {
-        await tx.environment.update({
-          where: { id: reservation.environmentId },
-          data: { isReserved: false },
-        });
-      }
+      // Update reservation status to RELEASED
+      const reservation = await updateReservationWithEvent(
+        tx,
+        req.params.id,
+        { status: 'RELEASED', releasedAt: new Date() },
+        { eventType: 'RELEASED', performedBy: performedById },
+      );
 
       return reservation;
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Extend reservation expiry
+router.post('/:id/extend', async (req, res, next) => {
+  try {
+    const { newExpiresAt, performedById } = req.body as any;
+    if (missingBodyFields(req.body, ['newExpiresAt', 'performedById']).length > 0) {
+      return res.status(400).json({ error: 'newExpiresAt and performedById are required to extend a reservation' });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'extended');
+
+      const oldExpiresAt = reservation.expiresAt;
+
+      return updateReservationWithEvent(
+        tx,
+        req.params.id,
+        { expiresAt: new Date(newExpiresAt) },
+        {
+          eventType: 'EXTENDED',
+          performedBy: performedById,
+          oldExpiresAt,
+          newExpiresAt: new Date(newExpiresAt),
+        },
+      );
+    });
+
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Handover ownership
+router.post('/:id/handover', async (req, res, next) => {
+  try {
+    const { toUserId, performedById, pocs } = req.body as any;
+    if (missingBodyFields(req.body, ['toUserId', 'performedById']).length > 0) {
+      return res.status(400).json({ error: 'toUserId and performedById are required to hand over a reservation' });
+    }
+    if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
+      return res.status(400).json({ error: 'Handover requires 1 primary and 1-2 secondary POCs' });
+    }
+
+    // Validate POCs
+    const newPocs: Array<{ userId: string; isPrimary: boolean }> = pocs;
+    if (newPocs.some((p) => !p || typeof p.userId !== 'string' || typeof p.isPrimary !== 'boolean')) {
+      return res.status(400).json({ error: 'Each POC must include userId and isPrimary' });
+    }
+
+    // Ensure exactly one primary POC and 1-2 secondary POCs
+    const newPocUserIds = newPocs.map((p) => p.userId);
+    if (new Set(newPocUserIds).size !== newPocUserIds.length) {
+      return res.status(400).json({ error: 'A user cannot be selected more than once for the handover' });
+    }
+
+    // Validate that there is exactly 1 primary and 1-2 secondary POCs
+    const primaryCount = newPocs.filter((p) => p.isPrimary).length;
+    const secondaryCount = newPocs.length - primaryCount;
+    if (primaryCount !== 1 || secondaryCount < 1 || secondaryCount > 2) {
+      return res.status(400).json({ error: 'Handover requires exactly 1 primary and 1-2 secondary POCs' });
+    }
+    // Ensure the new owner is one of the new POCs
+    if (!newPocUserIds.includes(toUserId)) {
+      return res.status(400).json({ error: 'The new owner must be one of the new POCs' });
+    }
+
+    // Validate that all user IDs exist in the database
+    const result = await prisma.$transaction(async (tx) => {
+      const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'handed over');
+      const reservationWithPocs = await findReservationById(tx, req.params.id, { pocs: true });
+      if (!reservationWithPocs) throw httpError('Reservation not found', 404);
+
+      const users = await tx.user.findMany({
+        where: { id: { in: [...new Set([...newPocUserIds, toUserId])] } },
+        select: { id: true },
+      });
+      if (users.length !== new Set([...newPocUserIds, toUserId]).size) {
+        throw httpError('One or more new POC users do not exist', 400);
+      }
+
+      const fromUserId = reservation.currentOwnerId;
+      const previousPocUserIds = reservationWithPocs.pocs.map((poc) => poc.userId);
+
+      // Update reservation with new owner and create handover event
+      const updated = await updateReservationWithEvent(
+        tx,
+        req.params.id,
+        { currentOwnerId: toUserId },
+        {
+          eventType: 'HANDOVER',
+          performedBy: performedById,
+          fromUserId,
+          toUserId,
+          metadata: { previousPocUserIds, newPocUserIds },
+        },
+      );
+
+      // Update POCs: delete existing POCs and create new ones
+      await tx.reservationPOC.deleteMany({ where: { reservationId: reservation.id } });
+      await tx.reservationPOC.createMany({
+        data: newPocs.map((poc) => ({
+          reservationId: reservation.id,
+          userId: poc.userId,
+          isPrimary: poc.isPrimary,
+        })),
+      });
+
+      // Return the updated reservation with POCs and events included
+      return findReservationById(tx, updated.id, { pocs: true, events: true });
     });
 
     res.json(result);

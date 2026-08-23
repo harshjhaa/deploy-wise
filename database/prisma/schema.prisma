@@ -13,7 +13,6 @@ model User {
   email        String   @unique
   passwordHash String
   role         String   @default("USER")
-  status       String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   lastLoginAt  DateTime?
@@ -30,7 +29,6 @@ model Environment {
   name                String   @unique
   description         String?
   isActive            Boolean  @default(true)
-  isReserved          Boolean  @default(false)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

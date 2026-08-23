@@ -32,11 +32,29 @@ async function main() {
     ],
     skipDuplicates: true,
   });
+
+  const users = await Promise.all([
+    prisma.user.upsert({
+      where: { email: 'primary+seed@example.com' },
+      update: {},
+      create: { name: 'Primary Seed User', email: 'primary+seed@example.com', passwordHash: 'seed-placeholder-hash', role: 'USER' },
+    }),
+    prisma.user.upsert({
+      where: { email: 'secondary1+seed@example.com' },
+      update: {},
+      create: { name: 'Secondary Seed User 1', email: 'secondary1+seed@example.com', passwordHash: 'seed-placeholder-hash', role: 'USER' },
+    }),
+    prisma.user.upsert({
+      where: { email: 'secondary2+seed@example.com' },
+      update: {},
+      create: { name: 'Secondary Seed User 2', email: 'secondary2+seed@example.com', passwordHash: 'seed-placeholder-hash', role: 'USER' },
+    }),
+  ]);
+
 }
 
 main()
   .catch((e) => {
-    // eslint-disable-next-line no-console
     console.error(e);
     process.exit(1);
   })
