@@ -1,5 +1,7 @@
 {
   "name": "deploywise",
+  "author": {"name": "Harsh Jha", "email": "harsh.jha@arrise.com"},
+  "description": "A tool to manage deployments and environments",
   "private": true,
   "version": "0.1.0",
   "workspaces": [

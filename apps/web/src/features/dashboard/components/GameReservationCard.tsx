@@ -1,4 +1,5 @@
 import { DashboardGame, DashboardReservation } from "../dashboard.types";
+import { Link } from "react-router-dom";
 
 type GameReservationCardProps = Readonly<{
   game: DashboardGame;
@@ -36,6 +37,9 @@ export function GameReservationCard({
           <span className="expiry-label">
             {formatExpiry(reservation.expiresAt)}
           </span>
+          <Link className="details-link" to={`/reservations/${reservation.id}`}>
+            View details
+          </Link>
         </div>
       ) : (
         <div className="available-summary">

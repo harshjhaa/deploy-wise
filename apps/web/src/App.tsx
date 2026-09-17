@@ -1,6 +1,7 @@
 import { AppShell } from "./components/layout/AppShell";
 import { FoundationPage } from "./features/foundation/FoundationPage";
 import { ProfilePage } from "./features/profile/ProfilePage";
+import { ReservationDetailsPage } from "./features/reservations/ReservationDetailsPage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
 import { ProtectedRoute } from "./features/auth/ProtectedRoute";
@@ -15,6 +16,10 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route path="/" element={<FoundationPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route
+            path="/reservations/:id"
+            element={<ReservationDetailsPage />}
+          />
         </Route>
       </Route>
     </Routes>

@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { DashboardGame, DashboardUser } from "../dashboard.types";
+import { MultiSelectDropdown } from "../../../components/commonComponents/MultiSelectDropdown";
 import "./ReserveModal.scss";
 
 type ReserveModalProps = Readonly<{
@@ -31,15 +32,6 @@ export function ReserveModal({
   const [secondaryUserIds, setSecondaryUserIds] = useState<string[]>([]);
   const [expiresAt, setExpiresAt] = useState("");
 
-  function toggleSecondary(userId: string) {
-    setSecondaryUserIds((current) => {
-      if (current.includes(userId))
-        return current.filter((id) => id !== userId);
-      if (current.length < 2) return [...current, userId];
-      return current;
-    });
-  }
-
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit({
@@ -53,12 +45,7 @@ export function ReserveModal({
   }
 
   return (
-    <dialog
-      open
-      className="modal-backdrop"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-      aria-labelledby="reserve-title"
-    >
+    <dialog open className="modal-backdrop" aria-labelledby="reserve-title">
       <div className="reserve-modal">
         <button
           className="modal-close"
@@ -86,7 +73,10 @@ export function ReserveModal({
             <span>Primary POC and owner</span>
             <select
               value={primaryUserId}
-              onChange={(event) => setPrimaryUserId(event.target.value)}
+              onChange={(event) => {
+                setPrimaryUserId(event.target.value);
+                setSecondaryUserIds([]);
+              }}
               required
             >
               <option value="">Select a primary POC</option>
@@ -97,21 +87,18 @@ export function ReserveModal({
               ))}
             </select>
           </label>
-          <fieldset className="secondary-field">
-            <legend>Secondary POCs (choose 1 or 2)</legend>
-            {users
+          <MultiSelectDropdown
+            label="Secondary POCs (choose 1 or 2)"
+            options={users
               .filter((user) => user.id !== primaryUserId)
-              .map((user) => (
-                <label key={user.id} className="checkbox-row">
-                  <input
-                    type="checkbox"
-                    checked={secondaryUserIds.includes(user.id)}
-                    onChange={() => toggleSecondary(user.id)}
-                  />
-                  {user.name || user.email}
-                </label>
-              ))}
-          </fieldset>
+              .map((user) => ({ id: user.id, label: user.name || user.email }))}
+            selectedIds={secondaryUserIds}
+            onChange={setSecondaryUserIds}
+            minSelections={1}
+            maxSelections={2}
+            placeholder="Select secondary POCs"
+            disabled={!primaryUserId}
+          />
           <label className="modal-field">
             <span>Expires at</span>
             <input
