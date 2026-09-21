@@ -29,9 +29,15 @@ export async function logoutUser() {
   return apiClient.post<{ ok: boolean }>("/api/v1/auth/logout");
 }
 
-export async function forgotPassword(email: string, newPassword: string, confirmPassword: string) {
-  return apiClient.post<{ ok: boolean; message: string }>("/api/v1/auth/forgot-password", {
+export async function requestPasswordReset(email: string) {
+  return apiClient.post<{ ok: boolean; message: string; resetToken?: string }>("/api/v1/auth/forgot-password", {
     email,
+  });
+}
+
+export async function resetPasswordWithToken(token: string, newPassword: string, confirmPassword: string) {
+  return apiClient.post<{ ok: boolean; message: string }>("/api/v1/auth/reset-password-token", {
+    token,
     newPassword,
     confirmPassword,
   });

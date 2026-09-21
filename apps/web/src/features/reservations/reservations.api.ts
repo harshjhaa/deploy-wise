@@ -5,32 +5,30 @@ export function fetchReservation(id: string) {
   return apiClient.get<ReservationDetail>(`/api/v1/reservations/${id}`);
 }
 
-export function releaseReservation(id: string, performedById: string) {
-  return apiClient.post(`/api/v1/reservations/${id}/release`, {
-    performedById,
-  });
+export function releaseReservation(id: string, reason?: string) {
+  return apiClient.post(`/api/v1/reservations/${id}/release`, { reason });
 }
 
 export function extendReservation(
   id: string,
   newExpiresAt: string,
-  performedById: string,
+  reason?: string,
 ) {
   return apiClient.post(`/api/v1/reservations/${id}/extend`, {
     newExpiresAt,
-    performedById,
+    reason,
   });
 }
 
 export function handoverReservation(
   id: string,
-  performedById: string,
   toUserId: string,
   pocs: { userId: string; isPrimary: boolean }[],
+  reason?: string,
 ) {
   return apiClient.post(`/api/v1/reservations/${id}/handover`, {
-    performedById,
     toUserId,
     pocs,
+    reason,
   });
 }

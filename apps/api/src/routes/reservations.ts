@@ -141,17 +141,28 @@ router.get('/', async (req, res, next) => {
 // Release a reservation
 router.post('/:id/release', async (req, res, next) => {
   try {
+    const { reason } = req.body as { reason?: string };
     const performedById = req.user!.id;
+    const isAdminOverride = req.user!.role === 'ADMIN';
+    if (isAdminOverride && !reason?.trim()) {
+      return res.status(400).json({ error: 'A reason is required for an admin override.' });
+    }
 
     const result = await prisma.$transaction(async (tx) => {
-      await findActiveReservationForPoc(tx, req.params.id, performedById, 'released');
+      if (!isAdminOverride) {
+        await findActiveReservationForPoc(tx, req.params.id, performedById, 'released');
+      }
 
       // Update reservation status to RELEASED
       const reservation = await updateReservationWithEvent(
         tx,
         req.params.id,
         { status: 'RELEASED', releasedAt: new Date() },
-        { eventType: 'RELEASED', performedBy: performedById },
+        {
+          eventType: isAdminOverride ? 'ADMIN_OVERRIDE_RELEASED' : 'RELEASED',
+          performedBy: performedById,
+          metadata: isAdminOverride ? { reason: reason!.trim() } : undefined,
+        },
       );
 
       return reservation;
@@ -166,15 +177,25 @@ router.post('/:id/release', async (req, res, next) => {
 // Extend reservation expiry
 router.post('/:id/extend', async (req, res, next) => {
   try {
-    const { newExpiresAt } = req.body as any;
+    const { newExpiresAt, reason } = req.body as any;
     if (missingBodyFields(req.body, ['newExpiresAt']).length > 0) {
       return res.status(400).json({ error: 'newExpiresAt is required to extend a reservation' });
     }
 
     const performedById = req.user!.id;
+    const isAdminOverride = req.user!.role === 'ADMIN';
+    if (isAdminOverride && !reason?.trim()) {
+      return res.status(400).json({ error: 'A reason is required for an admin override.' });
+    }
 
     const result = await prisma.$transaction(async (tx) => {
-      const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'extended');
+      const reservation = isAdminOverride
+        ? await findReservationById(tx, req.params.id)
+        : await findActiveReservationForPoc(tx, req.params.id, performedById, 'extended');
+      if (!reservation) throw httpError('Reservation not found', 404);
+      if (reservation.status !== 'ACTIVE') {
+        throw httpError('Only an active reservation can be extended', 409);
+      }
 
       const oldExpiresAt = reservation.expiresAt;
 
@@ -183,10 +204,11 @@ router.post('/:id/extend', async (req, res, next) => {
         req.params.id,
         { expiresAt: new Date(newExpiresAt) },
         {
-          eventType: 'EXTENDED',
+          eventType: isAdminOverride ? 'ADMIN_OVERRIDE_EXTENDED' : 'EXTENDED',
           performedBy: performedById,
           oldExpiresAt,
           newExpiresAt: new Date(newExpiresAt),
+          metadata: isAdminOverride ? { reason: reason!.trim() } : undefined,
         },
       );
     });
@@ -200,11 +222,15 @@ router.post('/:id/extend', async (req, res, next) => {
 // Handover ownership
 router.post('/:id/handover', async (req, res, next) => {
   try {
-    const { toUserId, pocs } = req.body as any;
+    const { toUserId, pocs, reason } = req.body as any;
     if (missingBodyFields(req.body, ['toUserId']).length > 0) {
       return res.status(400).json({ error: 'toUserId is required to hand over a reservation' });
     }
     const performedById = req.user!.id;
+    const isAdminOverride = req.user!.role === 'ADMIN';
+    if (isAdminOverride && !reason?.trim()) {
+      return res.status(400).json({ error: 'A reason is required for an admin override.' });
+    }
     if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
       return res.status(400).json({ error: 'Handover requires 1 primary and 1-2 secondary POCs' });
     }
@@ -234,7 +260,13 @@ router.post('/:id/handover', async (req, res, next) => {
 
     // Validate that all user IDs exist in the database
     const result = await prisma.$transaction(async (tx) => {
-      const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'handed over');
+      const reservation = isAdminOverride
+        ? await findReservationById(tx, req.params.id)
+        : await findActiveReservationForPoc(tx, req.params.id, performedById, 'handed over');
+      if (!reservation) throw httpError('Reservation not found', 404);
+      if (reservation.status !== 'ACTIVE') {
+        throw httpError('Only an active reservation can be handed over', 409);
+      }
       const reservationWithPocs = await findReservationById(tx, req.params.id, { pocs: true });
       if (!reservationWithPocs) throw httpError('Reservation not found', 404);
 
@@ -255,11 +287,15 @@ router.post('/:id/handover', async (req, res, next) => {
         req.params.id,
         { currentOwnerId: toUserId },
         {
-          eventType: 'HANDOVER',
+          eventType: isAdminOverride ? 'ADMIN_OVERRIDE_HANDOVER' : 'HANDOVER',
           performedBy: performedById,
           fromUserId,
           toUserId,
-          metadata: { previousPocUserIds, newPocUserIds },
+          metadata: {
+            previousPocUserIds,
+            newPocUserIds,
+            ...(isAdminOverride ? { reason: reason!.trim() } : {}),
+          },
         },
       );
 

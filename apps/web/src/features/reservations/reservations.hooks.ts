@@ -22,8 +22,7 @@ function useReservationMutation() {
 export function useReleaseReservation(id: string) {
   const { queryClient } = useReservationMutation();
   return useMutation({
-    mutationFn: (performedById: string) =>
-      releaseReservation(id, performedById),
+    mutationFn: (reason?: string) => releaseReservation(id, reason),
     onSuccess: () =>
       queryClient
         .invalidateQueries({ queryKey: ["reservation", id] })
@@ -36,8 +35,8 @@ export function useReleaseReservation(id: string) {
 export function useExtendReservation(id: string) {
   const { queryClient } = useReservationMutation();
   return useMutation({
-    mutationFn: (input: { newExpiresAt: string; performedById: string }) =>
-      extendReservation(id, input.newExpiresAt, input.performedById),
+    mutationFn: (input: { newExpiresAt: string; reason?: string }) =>
+      extendReservation(id, input.newExpiresAt, input.reason),
     onSuccess: () =>
       queryClient
         .invalidateQueries({ queryKey: ["reservation", id] })
@@ -51,11 +50,11 @@ export function useHandoverReservation(id: string) {
   const { queryClient } = useReservationMutation();
   return useMutation({
     mutationFn: (input: {
-      performedById: string;
       toUserId: string;
       pocs: { userId: string; isPrimary: boolean }[];
+      reason?: string;
     }) =>
-      handoverReservation(id, input.performedById, input.toUserId, input.pocs),
+      handoverReservation(id, input.toUserId, input.pocs, input.reason),
     onSuccess: () =>
       queryClient
         .invalidateQueries({ queryKey: ["reservation", id] })

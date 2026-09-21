@@ -1,6 +1,6 @@
 import { FormEvent, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import { forgotPassword } from "./auth.api";
+import { requestPasswordReset, resetPasswordWithToken } from "./auth.api";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthField } from "./components/AuthField";
 import "./AuthPage.scss";
@@ -10,6 +10,7 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
@@ -18,8 +19,28 @@ export function ForgotPasswordPage() {
     setError("");
     setSuccess("");
 
-    if (!email.trim() || !newPassword || !confirmPassword) {
-      setError("Email, new password, and confirmation are required.");
+    if (!email.trim()) {
+      setError("Email is required.");
+      return;
+    }
+
+    if (!resetToken) {
+      try {
+        const response = await requestPasswordReset(email.trim());
+        if (response.resetToken) {
+          setResetToken(response.resetToken);
+          setSuccess("Reset token created. Set your new password to continue.");
+        } else {
+          setSuccess(response.message);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Password reset request failed.");
+      }
+      return;
+    }
+
+    if (!newPassword || !confirmPassword) {
+      setError("New password and confirmation are required.");
       return;
     }
 
@@ -34,7 +55,7 @@ export function ForgotPasswordPage() {
     }
 
     try {
-      await forgotPassword(email.trim(), newPassword, confirmPassword);
+      await resetPasswordWithToken(resetToken, newPassword, confirmPassword);
       setSuccess("Password reset successfully. You can now sign in.");
       setTimeout(() => {
         navigate("/login");
@@ -50,7 +71,7 @@ export function ForgotPasswordPage() {
         <p className="eyebrow">Reset access</p>
         <h2>Forgot password</h2>
         <p className="auth-subtitle">
-          No old password or OTP required. Just provide your email and a new password.
+          Request a short-lived reset token, then choose a new password.
         </p>
 
         <form className="auth-form" onSubmit={submit}>
@@ -66,26 +87,30 @@ export function ForgotPasswordPage() {
             autoComplete="email"
           />
 
-          <AuthField
-            id="newPassword"
-            label="New password"
-            type="password"
-            value={newPassword}
-            onChange={setNewPassword}
-            autoComplete="new-password"
-          />
+          {resetToken && (
+            <>
+              <AuthField
+                id="newPassword"
+                label="New password"
+                type="password"
+                value={newPassword}
+                onChange={setNewPassword}
+                autoComplete="new-password"
+              />
 
-          <AuthField
-            id="confirmPassword"
-            label="Confirm password"
-            type="password"
-            value={confirmPassword}
-            onChange={setConfirmPassword}
-            autoComplete="new-password"
-          />
+              <AuthField
+                id="confirmPassword"
+                label="Confirm password"
+                type="password"
+                value={confirmPassword}
+                onChange={setConfirmPassword}
+                autoComplete="new-password"
+              />
+            </>
+          )}
 
           <button className="auth-submit" type="submit">
-            Reset password
+            {resetToken ? "Reset password" : "Request reset token"}
           </button>
         </form>
 

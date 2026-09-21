@@ -22,6 +22,7 @@ model User {
   pocs               ReservationPOC[]
   eventsPerformed    ReservationEvent[] @relation("performedBy")
   tokensCreated      HandoverToken[] @relation("createdBy")
+  passwordResetTokens PasswordResetToken[]
 }
 
 model Environment {
@@ -104,4 +105,16 @@ model HandoverToken {
   expiresAt        DateTime?
   usedAt           DateTime?
   createdAt        DateTime    @default(now())
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId, expiresAt])
 }

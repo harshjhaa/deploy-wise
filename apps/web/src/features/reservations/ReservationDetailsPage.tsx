@@ -23,15 +23,14 @@ export function ReservationDetailsPage() {
   const { data: reservation, isLoading, error } = useReservation(id);
   const { data: dashboard } = useDashboardData();
   const currentUser = useAuthStore((state) => state.user);
-  const performerId =
-    dashboard?.users.find((user) => user.email === currentUser?.email)?.id ||
-    "";
+  const isAdmin = currentUser?.role === "ADMIN";
   const release = useReleaseReservation(id);
   const extend = useExtendReservation(id);
   const handover = useHandoverReservation(id);
   const [newExpiresAt, setNewExpiresAt] = useState("");
   const [newPrimaryId, setNewPrimaryId] = useState("");
   const [newSecondaryIds, setNewSecondaryIds] = useState<string[]>([]);
+  const [overrideReason, setOverrideReason] = useState("");
   const [actionError, setActionError] = useState("");
 
   if (isLoading)
@@ -56,11 +55,7 @@ export function ReservationDetailsPage() {
 
   function runAction(action: () => void) {
     setActionError("");
-    if (!performerId)
-      setActionError(
-        "Sign in with a known user before performing reservation actions.",
-      );
-    else action();
+    action();
   }
 
   function submitExtend(event: FormEvent<HTMLFormElement>) {
@@ -69,7 +64,7 @@ export function ReservationDetailsPage() {
     runAction(() =>
       extend.mutate({
         newExpiresAt: new Date(newExpiresAt).toISOString(),
-        performedById: performerId,
+        reason: isAdmin ? overrideReason : undefined,
       }),
     );
   }
@@ -79,8 +74,8 @@ export function ReservationDetailsPage() {
     if (!newPrimaryId || newSecondaryIds.length < 1) return;
     runAction(() =>
       handover.mutate({
-        performedById: performerId,
         toUserId: newPrimaryId,
+        reason: isAdmin ? overrideReason : undefined,
         pocs: [
           { userId: newPrimaryId, isPrimary: true },
           ...newSecondaryIds.map((userId) => ({ userId, isPrimary: false })),
@@ -146,6 +141,18 @@ export function ReservationDetailsPage() {
         </p>
       )}
       <section className="actions-panel">
+        {isAdmin && (
+          <label className="action-block">
+            <span>Admin override reason</span>
+            <input
+              type="text"
+              value={overrideReason}
+              onChange={(event) => setOverrideReason(event.target.value)}
+              placeholder="Explain why this override is required"
+              required
+            />
+          </label>
+        )}
         <div className="action-block">
           <h2>Release</h2>
           <p>Only a current POC can release this reservation.</p>
@@ -153,7 +160,7 @@ export function ReservationDetailsPage() {
             className="danger-button"
             type="button"
             disabled={release.isPending || reservation.status !== "ACTIVE"}
-            onClick={() => runAction(() => release.mutate(performerId))}
+            onClick={() => runAction(() => release.mutate(isAdmin ? overrideReason : undefined))}
           >
             {release.isPending ? "Releasing..." : "Release reservation"}
           </button>
