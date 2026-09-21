@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import prisma from '../prismaClient';
+import { requireAuth } from '../auth';
 import {
   createReservationEvent,
   findReservationById,
@@ -11,17 +12,17 @@ import {
 
 const router = Router();
 
+router.use(requireAuth);
 
 // Create a new reservation
 router.post('/', async (req, res, next) => {
   try {
-    const { environmentId, gameId, currentOwnerId, expiresAt, createdById, pocs } = req.body as any;
+    const { environmentId, gameId, currentOwnerId, expiresAt, pocs } = req.body as any;
     if (missingBodyFields(req.body, ['environmentId', 'gameId', 'currentOwnerId', 'expiresAt']).length > 0) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // If createdById is not provided, default to currentOwnerId
-    const creatorId = createdById || currentOwnerId;
+    const creatorId = req.user!.id;
     if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
       return res.status(400).json({ error: 'Reservation requires 1 primary and 1-2 secondary POCs' });
     }
@@ -140,10 +141,7 @@ router.get('/', async (req, res, next) => {
 // Release a reservation
 router.post('/:id/release', async (req, res, next) => {
   try {
-    const { performedById } = req.body as any;
-    if (missingBodyFields(req.body, ['performedById']).length > 0) {
-      return res.status(400).json({ error: 'performedById is required to release a reservation' });
-    }
+    const performedById = req.user!.id;
 
     const result = await prisma.$transaction(async (tx) => {
       await findActiveReservationForPoc(tx, req.params.id, performedById, 'released');
@@ -168,10 +166,12 @@ router.post('/:id/release', async (req, res, next) => {
 // Extend reservation expiry
 router.post('/:id/extend', async (req, res, next) => {
   try {
-    const { newExpiresAt, performedById } = req.body as any;
-    if (missingBodyFields(req.body, ['newExpiresAt', 'performedById']).length > 0) {
-      return res.status(400).json({ error: 'newExpiresAt and performedById are required to extend a reservation' });
+    const { newExpiresAt } = req.body as any;
+    if (missingBodyFields(req.body, ['newExpiresAt']).length > 0) {
+      return res.status(400).json({ error: 'newExpiresAt is required to extend a reservation' });
     }
+
+    const performedById = req.user!.id;
 
     const result = await prisma.$transaction(async (tx) => {
       const reservation = await findActiveReservationForPoc(tx, req.params.id, performedById, 'extended');
@@ -200,10 +200,11 @@ router.post('/:id/extend', async (req, res, next) => {
 // Handover ownership
 router.post('/:id/handover', async (req, res, next) => {
   try {
-    const { toUserId, performedById, pocs } = req.body as any;
-    if (missingBodyFields(req.body, ['toUserId', 'performedById']).length > 0) {
-      return res.status(400).json({ error: 'toUserId and performedById are required to hand over a reservation' });
+    const { toUserId, pocs } = req.body as any;
+    if (missingBodyFields(req.body, ['toUserId']).length > 0) {
+      return res.status(400).json({ error: 'toUserId is required to hand over a reservation' });
     }
+    const performedById = req.user!.id;
     if (!Array.isArray(pocs) || pocs.length < 2 || pocs.length > 3) {
       return res.status(400).json({ error: 'Handover requires 1 primary and 1-2 secondary POCs' });
     }

@@ -1,6 +1,8 @@
 export type AuthUser = {
-  name: string;
+  id: string;
+  name: string | null;
   email: string;
+  role: string;
 };
 
 export type AuthFormValues = {

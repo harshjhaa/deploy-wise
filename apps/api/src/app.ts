@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import healthRouter from './routes/health';
+import authRouter from './routes/auth';
 import environmentsRouter from './routes/environments';
 import gamesRouter from './routes/games';
 import reservationsRouter from './routes/reservations';
@@ -30,6 +31,7 @@ app.use(cookieParser());
 
 //Register routes
 app.use('/health', healthRouter);
+app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/environments', environmentsRouter);
 app.use('/api/v1/games', gamesRouter);
 app.use('/api/v1/reservations', reservationsRouter);

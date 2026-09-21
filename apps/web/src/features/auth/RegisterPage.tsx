@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthField } from "./components/AuthField";
 import { useAuthStore } from "../../store/authStore";
+import { registerUser } from "./auth.api";
 import "./AuthPage.scss";
 
 export function RegisterPage() {
@@ -13,15 +14,21 @@ export function RegisterPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!name.trim() || !email.trim() || password.length < 8) {
       return setError(
         "Enter your name, email, and a password of at least 8 characters.",
       );
     }
-    signIn({ name: name.trim(), email: email.trim() });
-    navigate("/");
+
+    try {
+      const response = await registerUser(name.trim(), email.trim(), password);
+      signIn(response.user);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed");
+    }
   }
 
   return (

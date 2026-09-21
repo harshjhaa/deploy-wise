@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { AuthLayout } from "./components/AuthLayout";
 import { AuthField } from "./components/AuthField";
 import { useAuthStore } from "../../store/authStore";
+import { loginUser } from "./auth.api";
 import "./AuthPage.scss";
 
 export function LoginPage() {
@@ -12,12 +13,18 @@ export function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!email.trim() || !password)
       return setError("Enter your email and password.");
-    signIn({ name: email.split("@")[0], email: email.trim() });
-    navigate("/");
+
+    try {
+      const response = await loginUser(email.trim(), password);
+      signIn(response.user);
+      navigate("/");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    }
   }
 
   return (
@@ -56,6 +63,9 @@ export function LoginPage() {
         </form>
         <p className="auth-switch">
           New here? <NavLink to="/register">Create an account</NavLink>
+        </p>
+        <p className="auth-switch">
+          Forgot password? <NavLink to="/forgot-password">Reset it</NavLink>
         </p>
       </div>
     </AuthLayout>
