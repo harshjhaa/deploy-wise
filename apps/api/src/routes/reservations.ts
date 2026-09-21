@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createHash, randomBytes } from 'crypto';
 import prisma from '../prismaClient';
 import { requireAuth } from '../auth';
 import {
@@ -150,7 +151,17 @@ router.post('/:id/release', async (req, res, next) => {
 
     const result = await prisma.$transaction(async (tx) => {
       if (!isAdminOverride) {
-        await findActiveReservationForPoc(tx, req.params.id, performedById, 'released');
+        const reservation = await findReservationById(tx, req.params.id, { pocs: true });
+        if (!reservation) throw httpError('Reservation not found', 404);
+        if (reservation.status !== 'ACTIVE') {
+          throw httpError('Only an active reservation can be released', 409);
+        }
+
+        const isCurrentOwner = reservation.currentOwnerId === performedById;
+        const isCurrentPoc = reservation.pocs.some((poc) => poc.userId === performedById);
+        if (!isCurrentOwner && !isCurrentPoc) {
+          throw httpError('Only the current owner, a POC, or an admin can release this reservation', 403);
+        }
       }
 
       // Update reservation status to RELEASED
@@ -189,12 +200,18 @@ router.post('/:id/extend', async (req, res, next) => {
     }
 
     const result = await prisma.$transaction(async (tx) => {
-      const reservation = isAdminOverride
-        ? await findReservationById(tx, req.params.id)
-        : await findActiveReservationForPoc(tx, req.params.id, performedById, 'extended');
+      const reservation = await findReservationById(tx, req.params.id, { pocs: true });
       if (!reservation) throw httpError('Reservation not found', 404);
       if (reservation.status !== 'ACTIVE') {
         throw httpError('Only an active reservation can be extended', 409);
+      }
+
+      if (!isAdminOverride) {
+        const isCurrentOwner = reservation.currentOwnerId === performedById;
+        const isCurrentPoc = reservation.pocs.some((poc) => poc.userId === performedById);
+        if (!isCurrentOwner && !isCurrentPoc) {
+          throw httpError('Only the current owner, a POC, or an admin can extend this reservation', 403);
+        }
       }
 
       const oldExpiresAt = reservation.expiresAt;
@@ -214,6 +231,176 @@ router.post('/:id/extend', async (req, res, next) => {
     });
 
     res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Generate a shareable takeover token for a reservation
+router.post('/:id/takeover-token', async (req, res, next) => {
+  try {
+    const { reason } = req.body as { reason?: string };
+    const performedById = req.user!.id;
+    const reservation = await findReservationById(prisma, req.params.id, { pocs: true });
+    if (!reservation) {
+      return res.status(404).json({ error: 'Reservation not found' });
+    }
+
+    const isAdminOverride = req.user!.role === 'ADMIN';
+    const isCurrentOwner = reservation.currentOwnerId === performedById;
+    const isCurrentPoc = reservation.pocs.some((poc) => poc.userId === performedById);
+    if (!isAdminOverride && !isCurrentOwner && !isCurrentPoc) {
+      return res.status(403).json({ error: 'Only the current owner, a POC, or an admin can generate a takeover token.' });
+    }
+
+    if (isAdminOverride && !reason?.trim()) {
+      return res.status(400).json({ error: 'A reason is required for an admin takeover token.' });
+    }
+
+    const rawToken = randomBytes(32).toString('hex');
+    const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const result = await prisma.$transaction(async (tx) => {
+      await tx.handoverToken.deleteMany({ where: { reservationId: reservation.id, usedAt: null } });
+      const createdToken = await tx.handoverToken.create({
+        data: {
+          reservationId: reservation.id,
+          tokenHash,
+          createdBy: performedById,
+          expiresAt,
+        },
+      });
+
+      await createReservationEvent(tx, {
+        reservationId: reservation.id,
+        eventType: isAdminOverride ? 'ADMIN_OVERRIDE_TAKEOVER_TOKEN_CREATED' : 'TAKEOVER_TOKEN_CREATED',
+        performedBy: performedById,
+        metadata: {
+          tokenId: createdToken.id,
+          expiresAt: expiresAt.toISOString(),
+          ...(reason?.trim() ? { reason: reason.trim() } : {}),
+        },
+      });
+
+      return createdToken;
+    });
+
+    res.json({
+      ok: true,
+      message: 'Takeover token created successfully.',
+      token: process.env.NODE_ENV !== 'production' ? rawToken : undefined,
+      tokenId: result.id,
+      expiresAt,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Redeem a shareable takeover token to transfer ownership
+router.post('/:id/redeem-takeover', async (req, res, next) => {
+  try {
+    const { token, toUserId, pocs, reason } = req.body as any;
+    if (!token || !toUserId || !Array.isArray(pocs)) {
+      return res.status(400).json({ error: 'Token, toUserId, and POCs are required.' });
+    }
+
+    const performedById = req.user!.id;
+    const isAdminOverride = req.user!.role === 'ADMIN';
+    if (isAdminOverride && !reason?.trim()) {
+      return res.status(400).json({ error: 'A reason is required for an admin takeover.' });
+    }
+
+    const newPocs: Array<{ userId: string; isPrimary: boolean }> = pocs;
+    if (newPocs.some((p) => !p || typeof p.userId !== 'string' || typeof p.isPrimary !== 'boolean')) {
+      return res.status(400).json({ error: 'Each POC must include userId and isPrimary' });
+    }
+
+    const newPocUserIds = newPocs.map((p) => p.userId);
+    if (new Set(newPocUserIds).size !== newPocUserIds.length) {
+      return res.status(400).json({ error: 'A user cannot be selected more than once for the takeover' });
+    }
+
+    const primaryCount = newPocs.filter((p) => p.isPrimary).length;
+    const secondaryCount = newPocs.length - primaryCount;
+    if (primaryCount !== 1 || secondaryCount < 1 || secondaryCount > 2) {
+      return res.status(400).json({ error: 'Takeover requires exactly 1 primary and 1-2 secondary POCs' });
+    }
+    if (!newPocUserIds.includes(toUserId)) {
+      return res.status(400).json({ error: 'The new owner must be one of the new POCs' });
+    }
+
+    const tokenHash = createHash('sha256').update(token).digest('hex');
+
+    const result = await prisma.$transaction(async (tx) => {
+      const takeoverToken = await tx.handoverToken.findUnique({ where: { tokenHash } });
+      if (!takeoverToken) {
+        throw httpError('Takeover token is invalid', 400);
+      }
+      if (takeoverToken.reservationId !== req.params.id) {
+        throw httpError('Takeover token does not match this reservation', 400);
+      }
+      if (takeoverToken.usedAt || !takeoverToken.expiresAt || takeoverToken.expiresAt <= new Date()) {
+        throw httpError('Takeover token is expired or has already been used', 400);
+      }
+
+      const reservation = await findReservationById(tx, req.params.id, { pocs: true });
+      if (!reservation) throw httpError('Reservation not found', 404);
+      if (reservation.status !== 'ACTIVE') {
+        throw httpError('Only an active reservation can be taken over', 409);
+      }
+
+      const users = await tx.user.findMany({
+        where: { id: { in: [...new Set([...newPocUserIds, toUserId])] } },
+        select: { id: true },
+      });
+      if (users.length !== new Set([...newPocUserIds, toUserId]).size) {
+        throw httpError('One or more takeover users do not exist', 400);
+      }
+
+      const fromUserId = reservation.currentOwnerId;
+      const previousPocUserIds = reservation.pocs.map((poc) => poc.userId);
+
+      const updated = await updateReservationWithEvent(
+        tx,
+        req.params.id,
+        { currentOwnerId: toUserId },
+        {
+          eventType: isAdminOverride ? 'ADMIN_OVERRIDE_TAKEOVER' : 'TAKEOVER',
+          performedBy: performedById,
+          fromUserId,
+          toUserId,
+          metadata: {
+            previousPocUserIds,
+            newPocUserIds,
+            takeoverTokenId: takeoverToken.id,
+            ...(reason?.trim() ? { reason: reason.trim() } : {}),
+          },
+        },
+      );
+
+      await tx.reservationPOC.deleteMany({ where: { reservationId: reservation.id } });
+      await tx.reservationPOC.createMany({
+        data: newPocs.map((poc) => ({
+          reservationId: reservation.id,
+          userId: poc.userId,
+          isPrimary: poc.isPrimary,
+        })),
+      });
+
+      await tx.handoverToken.update({
+        where: { id: takeoverToken.id },
+        data: { usedAt: new Date() },
+      });
+      await tx.handoverToken.deleteMany({
+        where: { reservationId: reservation.id, id: { not: takeoverToken.id } },
+      });
+
+      return findReservationById(tx, updated.id, { pocs: true, events: true });
+    });
+
+    res.json({ ok: true, message: 'Reservation takeover completed successfully.', reservation: result });
   } catch (error) {
     next(error);
   }
@@ -260,13 +447,20 @@ router.post('/:id/handover', async (req, res, next) => {
 
     // Validate that all user IDs exist in the database
     const result = await prisma.$transaction(async (tx) => {
-      const reservation = isAdminOverride
-        ? await findReservationById(tx, req.params.id)
-        : await findActiveReservationForPoc(tx, req.params.id, performedById, 'handed over');
+      const reservation = await findReservationById(tx, req.params.id, { pocs: true });
       if (!reservation) throw httpError('Reservation not found', 404);
       if (reservation.status !== 'ACTIVE') {
         throw httpError('Only an active reservation can be handed over', 409);
       }
+
+      if (!isAdminOverride) {
+        const isCurrentOwner = reservation.currentOwnerId === performedById;
+        const isCurrentPoc = reservation.pocs.some((poc) => poc.userId === performedById);
+        if (!isCurrentOwner && !isCurrentPoc) {
+          throw httpError('Only the current owner, a POC, or an admin can hand over this reservation', 403);
+        }
+      }
+
       const reservationWithPocs = await findReservationById(tx, req.params.id, { pocs: true });
       if (!reservationWithPocs) throw httpError('Reservation not found', 404);
 
