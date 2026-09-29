@@ -7,6 +7,7 @@ import environmentsRouter from './routes/environments';
 import gamesRouter from './routes/games';
 import reservationsRouter from './routes/reservations';
 import usersRouter from './routes/users';
+import deploymentsRouter from './routes/deployments';
 import { requireAuth } from './auth';
 
 const app = express();
@@ -37,6 +38,7 @@ app.use('/api/v1/environments', requireAuth, environmentsRouter);
 app.use('/api/v1/games', requireAuth, gamesRouter);
 app.use('/api/v1/reservations', reservationsRouter);
 app.use('/api/v1/users', requireAuth, usersRouter);
+app.use('/api/v1/deployments', deploymentsRouter);
 
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   // simple centralized error handler

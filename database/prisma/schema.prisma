@@ -23,6 +23,7 @@ model User {
   eventsPerformed    ReservationEvent[] @relation("performedBy")
   tokensCreated      HandoverToken[] @relation("createdBy")
   passwordResetTokens PasswordResetToken[]
+  gitLabDeploymentRequests GitLabDeploymentRequest[] @relation("deploymentRequester")
 }
 
 model Environment {
@@ -67,6 +68,7 @@ model Reservation {
   pocs ReservationPOC[]
   events ReservationEvent[]
   handoverTokens HandoverToken[]
+  gitLabDeploymentRequests GitLabDeploymentRequest[]
 
   @@index([environmentId, gameId])
 }
@@ -118,4 +120,24 @@ model PasswordResetToken {
   createdAt DateTime @default(now())
 
   @@index([userId, expiresAt])
+}
+
+model GitLabDeploymentRequest {
+  id             String   @id @default(uuid())
+  reservationId  String
+  reservation    Reservation @relation(fields: [reservationId], references: [id])
+  requestedById  String
+  requestedBy    User     @relation("deploymentRequester", fields: [requestedById], references: [id])
+  branch         String
+  deployType     String   @default("regular")
+  status         String   @default("REQUESTED")
+  pipelineId     String?  @unique
+  pipelineUrl    String?
+  buildJobId     String?
+  buildStatus    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([reservationId, createdAt])
+  @@index([requestedById, createdAt])
 }

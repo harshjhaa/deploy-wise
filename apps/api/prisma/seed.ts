@@ -13,6 +13,7 @@ async function main() {
       { name: 'QA7', description: 'QA7 environment' },
       { name: 'QA8', description: 'QA8 environment' },
       { name: 'QA9', description: 'QA9 environment' },
+      { name: 'Stress 1', description: 'Non-production Stress 1 environment' },
       { name: 'DEV2', description: 'Dev2 environment' },
       { name: 'UAT', description: 'UAT environment' },
     ],
