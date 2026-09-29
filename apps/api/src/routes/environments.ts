@@ -16,10 +16,10 @@ router.get('/', async (req, res, next) => {
             status: 'ACTIVE',
           },
           include: {
-            game: true,
-            pocs: {
-              include: {
-                // assuming user relation will be added later
+            currentOwner: {
+              select: {
+                name: true,
+                email: true,
               },
             },
           },
@@ -36,6 +36,7 @@ router.get('/', async (req, res, next) => {
         id: reservation.id,
         gameId: reservation.gameId,
         currentOwnerId: reservation.currentOwnerId,
+        currentOwnerName: reservation.currentOwner.name ?? reservation.currentOwner.email,
         status: reservation.status,
         expiresAt: reservation.expiresAt,
       })),

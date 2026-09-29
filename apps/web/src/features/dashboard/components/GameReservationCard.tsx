@@ -33,7 +33,7 @@ export function GameReservationCard({
       {reservation ? (
         <div className="reservation-summary">
           <span className="summary-label">Current owner</span>
-          <strong>{reservation.currentOwnerId}</strong>
+          <strong>{reservation.currentOwnerName}</strong>
           <span className="expiry-label">
             {formatExpiry(reservation.expiresAt)}
           </span>

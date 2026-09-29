@@ -32,3 +32,25 @@ export function handoverReservation(
     reason,
   });
 }
+
+export function createTakeoverToken(id: string, reason?: string) {
+  return apiClient.post<{ ok: boolean; message: string; token?: string; tokenId: string; expiresAt: string }>(
+    `/api/v1/reservations/${id}/takeover-token`,
+    { reason },
+  );
+}
+
+export function redeemTakeoverToken(
+  id: string,
+  token: string,
+  toUserId: string,
+  pocs: { userId: string; isPrimary: boolean }[],
+  reason?: string,
+) {
+  return apiClient.post(`/api/v1/reservations/${id}/redeem-takeover`, {
+    token,
+    toUserId,
+    pocs,
+    reason,
+  });
+}

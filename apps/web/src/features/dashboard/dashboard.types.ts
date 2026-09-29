@@ -14,6 +14,7 @@ export type DashboardReservation = {
   id: string;
   gameId: string;
   currentOwnerId: string;
+  currentOwnerName: string;
   status: string;
   expiresAt: string;
 };

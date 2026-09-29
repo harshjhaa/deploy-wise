@@ -1,8 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
+  createTakeoverToken,
   extendReservation,
   fetchReservation,
   handoverReservation,
+  redeemTakeoverToken,
   releaseReservation,
 } from "./reservations.api";
 
@@ -55,6 +57,38 @@ export function useHandoverReservation(id: string) {
       reason?: string;
     }) =>
       handoverReservation(id, input.toUserId, input.pocs, input.reason),
+    onSuccess: () =>
+      queryClient
+        .invalidateQueries({ queryKey: ["reservation", id] })
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }),
+        ),
+  });
+}
+
+export function useCreateTakeoverToken(id: string) {
+  const { queryClient } = useReservationMutation();
+  return useMutation({
+    mutationFn: (reason?: string) => createTakeoverToken(id, reason),
+    onSuccess: () =>
+      queryClient
+        .invalidateQueries({ queryKey: ["reservation", id] })
+        .then(() =>
+          queryClient.invalidateQueries({ queryKey: ["dashboard-data"] }),
+        ),
+  });
+}
+
+export function useRedeemTakeoverToken(id: string) {
+  const { queryClient } = useReservationMutation();
+  return useMutation({
+    mutationFn: (input: {
+      token: string;
+      toUserId: string;
+      pocs: { userId: string; isPrimary: boolean }[];
+      reason?: string;
+    }) =>
+      redeemTakeoverToken(id, input.token, input.toUserId, input.pocs, input.reason),
     onSuccess: () =>
       queryClient
         .invalidateQueries({ queryKey: ["reservation", id] })
