@@ -135,6 +135,8 @@ model GitLabDeploymentRequest {
   pipelineUrl    String?
   buildJobId     String?
   buildStatus    String?
+  deployJobId    String?
+  deployStatus   String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

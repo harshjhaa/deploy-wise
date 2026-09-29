@@ -41,8 +41,7 @@ export function AppShell({ children }: Readonly<PropsWithChildren>) {
             Profile
           </NavLink>
         </nav>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span className="environment-label">LOCAL / PHASE 1</span>
+        <div className="topbar-actions">
           <button className="secondary-button" type="button" onClick={() => void handleLogout()}>
             Logout
           </button>

@@ -5,6 +5,7 @@ import { MultiSelectDropdown } from "../../components/commonComponents/MultiSele
 import { useAuthStore } from "../../store/authStore";
 import { DashboardUser } from "../dashboard/dashboard.types";
 import { useDashboardData } from "../dashboard/dashboard.hooks";
+import { DeploymentPanel } from "./DeploymentPanel";
 import {
   useCreateTakeoverToken,
   useExtendReservation,
@@ -181,6 +182,11 @@ export function ReservationDetailsPage() {
           </ul>
         </section>
       </div>
+      <DeploymentPanel
+        reservation={reservation}
+        gameName={gameName}
+        environmentName={environmentName}
+      />
       {(canManageReservation || canRedeemTakeoverToken) && (
         <>
           {actionError && (
