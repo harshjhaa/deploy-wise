@@ -19,6 +19,7 @@ export async function fetchDashboardData(): Promise<DashboardData> {
 export type CreateReservationPayload = {
   environmentId: string;
   gameId: string;
+  description: string;
   currentOwnerId: string;
   createdById: string;
   expiresAt: string;

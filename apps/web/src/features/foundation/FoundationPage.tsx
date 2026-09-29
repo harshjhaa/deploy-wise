@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { AsyncState } from "../../components/feedback/AsyncState";
-import { DashboardToolbar } from "../dashboard/components/DashboardToolbar";
 import { EnvironmentSection } from "../dashboard/components/EnvironmentSection";
 import {
   useCreateReservation,
@@ -11,87 +10,88 @@ import {
   DashboardGame,
 } from "../dashboard/dashboard.types";
 import { ReserveModal } from "../dashboard/components/ReserveModal";
-import { useDashboardStore } from "../../store/dashboardStore";
 import "../dashboard/DashboardPage.scss";
 
 export function FoundationPage() {
   const { data, isLoading, error, isFetching, refetch } = useDashboardData();
   const createReservation = useCreateReservation();
+  const [selectedEnvironmentId, setSelectedEnvironmentId] = useState<string | null>(null);
+  const [environmentSearch, setEnvironmentSearch] = useState("");
   const [selectedResource, setSelectedResource] = useState<{
     environment: DashboardEnvironment;
     game: DashboardGame;
   } | null>(null);
-  const search = useDashboardStore((state) => state.search).toLowerCase();
-  const availability = useDashboardStore((state) => state.availability);
   const environments =
     data?.environments.filter((environment) => {
-      const matchesSearch =
-        !search ||
-        environment.name.toLowerCase().includes(search) ||
-        environment.reservations.some((reservation) =>
-          data.games
-            .find((game) => game.id === reservation.gameId)
-            ?.name.toLowerCase()
-            .includes(search),
-        );
-      const hasAvailable = data.games.some(
-        (game) =>
-          game.isActive &&
-          !environment.reservations.some(
-            (reservation) => reservation.gameId === game.id,
-          ),
+      return (
+        environment.isActive &&
+        environment.name.toLowerCase().includes(environmentSearch.trim().toLowerCase())
       );
-      const hasReserved = environment.reservations.length > 0;
-      const matchesAvailability =
-        availability === "all" ||
-        (availability === "available" && hasAvailable) ||
-        (availability === "reserved" && hasReserved);
-      return environment.isActive && matchesSearch && matchesAvailability;
     }) ?? [];
+  const selectedEnvironment =
+    environments.find((environment) => environment.id === selectedEnvironmentId) ??
+    environments[0];
 
   return (
-    <main className="content">
-      <section className="dashboard-heading">
-        <div>
-          <p className="eyebrow">Environment coordination</p>
-          <h1>Know what is clear to deploy.</h1>
-          <p className="intro-copy">
-            A live view of shared environments, owners and reservation windows.
-          </p>
-        </div>
-        <button
-          className="refresh-button"
-          type="button"
-          onClick={() => void refetch()}
-          disabled={isFetching}
-        >
-          ↻ Refresh
-        </button>
-      </section>
-      <section className="dashboard-controls" aria-label="Dashboard controls">
-        <DashboardToolbar />
-      </section>
+    <main className="content dashboard-overview">
       <AsyncState isLoading={isLoading} error={error} />
-      <section className="environment-list" aria-label="Environments">
-        {!isLoading && environments.length === 0 && (
-          <p className="empty-state">
-            No environments match the current filters.
-          </p>
-        )}
-        {environments.map((environment) => (
-          <EnvironmentSection
-            key={environment.id}
-            environment={environment}
-            games={data?.games ?? []}
-            onReserve={(selectedEnvironment, selectedGame) =>
-              setSelectedResource({
-                environment: selectedEnvironment,
-                game: selectedGame,
-              })
-            }
-          />
-        ))}
-      </section>
+      {!isLoading && !error && (
+        <section className="environment-workspace" aria-label="Environment overview">
+          <aside className="environment-sidebar" aria-label="Select an environment">
+            <p className="eyebrow">Environments</p>
+            <label className="environment-search">
+              <span className="visually-hidden">Search environments</span>
+              <input
+                type="search"
+                value={environmentSearch}
+                onChange={(event) => setEnvironmentSearch(event.target.value)}
+                placeholder="Search environments"
+              />
+            </label>
+            {environments.length === 0 ? (
+              <p className="empty-state">
+                No environments match your search.
+              </p>
+            ) : (
+              <nav className="environment-selector" aria-label="Environments">
+                {environments.map((environment) => (
+                  <button
+                    key={environment.id}
+                    className={`environment-option ${
+                      selectedEnvironment?.id === environment.id ? "active" : ""
+                    }`}
+                    type="button"
+                    aria-pressed={selectedEnvironment?.id === environment.id}
+                    onClick={() => setSelectedEnvironmentId(environment.id)}
+                  >
+                    <span className="environment-option-name">{environment.name}</span>
+                    <span className="environment-option-meta">
+                      {environment.reservations.length} reservation
+                      {environment.reservations.length === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                ))}
+              </nav>
+            )}
+          </aside>
+          <div className="environment-body">
+            {selectedEnvironment ? (
+              <EnvironmentSection
+                key={selectedEnvironment.id}
+                environment={selectedEnvironment}
+                games={data?.games ?? []}
+                isRefreshing={isFetching}
+                onRefresh={() => void refetch()}
+                onReserve={(environment, game) =>
+                  setSelectedResource({ environment, game })
+                }
+              />
+            ) : (
+              <p className="empty-state">Select an environment to view its reservations.</p>
+            )}
+          </div>
+        </section>
+      )}
       {selectedResource && data && (
         <ReserveModal
           environmentId={selectedResource.environment.id}
@@ -121,22 +121,6 @@ export function FoundationPage() {
           }
         />
       )}
-      {/* Foundation resource status remains available through the API layer for later profile/admin surfaces. */}
-      <section
-        className="status-panel dashboard-footer"
-        aria-label="Dashboard status"
-      >
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">Live status</p>
-            <h2>Dashboard connected</h2>
-          </div>
-          <span className={`status-badge ${error ? "warning" : ""}`}>
-            <span className="status-dot" />
-            {error ? "Check connection" : "API connected"}
-          </span>
-        </div>
-      </section>
     </main>
   );
 }

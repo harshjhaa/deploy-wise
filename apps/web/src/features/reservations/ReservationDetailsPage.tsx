@@ -55,6 +55,13 @@ export function ReservationDetailsPage() {
     );
 
   const users = dashboard?.users || [];
+  const gameName =
+    dashboard?.games.find((game) => game.id === reservation.gameId)?.name ??
+    reservation.gameId;
+  const environmentName =
+    dashboard?.environments.find(
+      (environment) => environment.id === reservation.environmentId,
+    )?.name ?? reservation.environmentId;
   const currentPocIds = new Set(reservation.pocs.map((poc) => poc.userId));
   const availableUsers = users.filter((user) => !currentPocIds.has(user.id));
   const isPoc = currentUser ? currentPocIds.has(currentUser.id) : false;
@@ -106,7 +113,9 @@ export function ReservationDetailsPage() {
 
   function submitRedeemTakeoverToken() {
     if (!takeoverToken || !newPrimaryId || newSecondaryIds.length < 1) {
-      setActionError("Enter the token and select the new owner and secondary POCs first.");
+      setActionError(
+        "Enter the token and select the new owner and secondary POCs first.",
+      );
       return;
     }
     runAction(() =>
@@ -129,12 +138,11 @@ export function ReservationDetailsPage() {
       </Link>
       <header className="details-header">
         <div>
-          <p className="eyebrow">Reservation details</p>
-          <h1>{reservation.id}</h1>
-          <p className="details-meta">
-            {reservation.status} · Game {reservation.gameId} · Environment{" "}
-            {reservation.environmentId}
-          </p>
+          <h2 className="eyebrow">Reservation details</h2>
+          <p>Description: {reservation.description}</p>
+ 
+          <p className="details-meta">Game: {gameName}</p>
+          <p className="details-meta">Environment: {environmentName}</p>
         </div>
         <span className={`detail-status ${reservation.status.toLowerCase()}`}>
           {reservation.status}
@@ -197,14 +205,21 @@ export function ReservationDetailsPage() {
               <>
                 <div className="action-block">
                   <h2>Takeover token</h2>
-                  <p>Generate a short-lived takeover token for this reservation.</p>
+                  <p>
+                    Generate a short-lived takeover token for this reservation.
+                  </p>
                   <button
                     className="primary-button"
                     type="button"
-                    disabled={createTakeoverTokenMutation.isPending || reservation.status !== "ACTIVE"}
+                    disabled={
+                      createTakeoverTokenMutation.isPending ||
+                      reservation.status !== "ACTIVE"
+                    }
                     onClick={submitCreateTakeoverToken}
                   >
-                    {createTakeoverTokenMutation.isPending ? "Generating..." : "Generate takeover token"}
+                    {createTakeoverTokenMutation.isPending
+                      ? "Generating..."
+                      : "Generate takeover token"}
                   </button>
                   {takeoverToken && (
                     <label>
@@ -219,8 +234,14 @@ export function ReservationDetailsPage() {
                   <button
                     className="danger-button"
                     type="button"
-                    disabled={release.isPending || reservation.status !== "ACTIVE"}
-                    onClick={() => runAction(() => release.mutate(isAdmin ? overrideReason : undefined))}
+                    disabled={
+                      release.isPending || reservation.status !== "ACTIVE"
+                    }
+                    onClick={() =>
+                      runAction(() =>
+                        release.mutate(isAdmin ? overrideReason : undefined),
+                      )
+                    }
                   >
                     {release.isPending ? "Releasing..." : "Release reservation"}
                   </button>
@@ -239,7 +260,9 @@ export function ReservationDetailsPage() {
                   <button
                     className="primary-button"
                     type="submit"
-                    disabled={extend.isPending || reservation.status !== "ACTIVE"}
+                    disabled={
+                      extend.isPending || reservation.status !== "ACTIVE"
+                    }
                   >
                     {extend.isPending ? "Updating..." : "Extend reservation"}
                   </button>
@@ -268,7 +291,10 @@ export function ReservationDetailsPage() {
                     label="New secondary POCs (choose 1 or 2)"
                     options={availableUsers
                       .filter((user) => user.id !== newPrimaryId)
-                      .map((user) => ({ id: user.id, label: user.name || user.email }))}
+                      .map((user) => ({
+                        id: user.id,
+                        label: user.name || user.email,
+                      }))}
                     selectedIds={newSecondaryIds}
                     onChange={setNewSecondaryIds}
                     minSelections={1}
@@ -279,9 +305,13 @@ export function ReservationDetailsPage() {
                   <button
                     className="primary-button"
                     type="submit"
-                    disabled={handover.isPending || reservation.status !== "ACTIVE"}
+                    disabled={
+                      handover.isPending || reservation.status !== "ACTIVE"
+                    }
                   >
-                    {handover.isPending ? "Handing over..." : "Handover reservation"}
+                    {handover.isPending
+                      ? "Handing over..."
+                      : "Handover reservation"}
                   </button>
                 </form>
               </>
@@ -326,7 +356,10 @@ export function ReservationDetailsPage() {
                   label="New secondary POCs (choose 1 or 2)"
                   options={availableUsers
                     .filter((user) => user.id !== newPrimaryId)
-                    .map((user) => ({ id: user.id, label: user.name || user.email }))}
+                    .map((user) => ({
+                      id: user.id,
+                      label: user.name || user.email,
+                    }))}
                   selectedIds={newSecondaryIds}
                   onChange={setNewSecondaryIds}
                   minSelections={1}
@@ -337,9 +370,14 @@ export function ReservationDetailsPage() {
                 <button
                   className="primary-button"
                   type="submit"
-                  disabled={redeemTakeoverTokenMutation.isPending || reservation.status !== "ACTIVE"}
+                  disabled={
+                    redeemTakeoverTokenMutation.isPending ||
+                    reservation.status !== "ACTIVE"
+                  }
                 >
-                  {redeemTakeoverTokenMutation.isPending ? "Redeeming..." : "Redeem takeover token"}
+                  {redeemTakeoverTokenMutation.isPending
+                    ? "Redeeming..."
+                    : "Redeem takeover token"}
                 </button>
               </form>
             )}

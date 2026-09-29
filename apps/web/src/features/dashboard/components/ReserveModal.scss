@@ -1,10 +1,11 @@
 .modal-backdrop {
-  align-items: center;
   background: rgba(8, 15, 17, 0.78);
   border: 0;
-  display: flex;
+  display: grid;
+  height: 100vh;
+  height: 100dvh;
   inset: 0;
-  justify-content: center;
+  place-items: center;
   margin: 0;
   max-width: none;
   padding: 20px;
@@ -17,11 +18,16 @@
   border: 1px solid #536d70;
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.4);
   max-height: 90vh;
-  max-width: 520px;
+  max-height: 90dvh;
+  max-width: 760px;
   overflow-y: auto;
   padding: 30px;
   position: relative;
   width: 100%;
+}
+.reserve-modal .eyebrow,
+#reserve-title {
+  color: #e9eef2;
 }
 .modal-close {
   background: transparent;
@@ -44,8 +50,13 @@
 }
 .reserve-form {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin-top: 25px;
+}
+.reserve-form-error,
+.reserve-form-actions {
+  grid-column: 1 / -1;
 }
 .modal-field {
   display: grid;
@@ -60,16 +71,19 @@
   text-transform: uppercase;
 }
 .modal-field input,
-.modal-field select {
+.modal-field select,
+.modal-field textarea {
   background: #172428;
   border: 1px solid #385055;
   color: #edf4ed;
   font: inherit;
   padding: 12px;
+  resize: vertical;
   width: 100%;
 }
 .modal-field input:focus,
-.modal-field select:focus {
+.modal-field select:focus,
+.modal-field textarea:focus {
   border-color: #d6f36b;
   outline: none;
 }
@@ -97,4 +111,10 @@
 .secondary-button {
   background: #26373b;
   color: #dbe4e0;
+}
+
+@media (max-width: 640px) {
+  .reserve-form {
+    grid-template-columns: 1fr;
+  }
 }

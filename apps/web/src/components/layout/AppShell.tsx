@@ -1,11 +1,12 @@
 import { PropsWithChildren } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { logoutUser } from "../../features/auth/auth.api";
 import { useAuthStore } from "../../store/authStore";
 import "./AppShell.scss";
 
 export function AppShell({ children }: Readonly<PropsWithChildren>) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const signOut = useAuthStore((state) => state.signOut);
 
   async function handleLogout() {
@@ -20,7 +21,7 @@ export function AppShell({ children }: Readonly<PropsWithChildren>) {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${pathname === "/" ? "app-shell-dashboard" : ""}`}>
       <header className="topbar">
         <NavLink className="brand" to="/" aria-label="DeployWise home">
           <span className="brand-mark">DW</span>

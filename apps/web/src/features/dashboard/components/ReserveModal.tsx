@@ -10,6 +10,7 @@ type ReserveModalProps = Readonly<{
   users: DashboardUser[];
   onClose: () => void;
   onSubmit: (values: {
+    description: string;
     currentOwnerId: string;
     expiresAt: string;
     pocs: { userId: string; isPrimary: boolean }[];
@@ -31,10 +32,12 @@ export function ReserveModal({
   const [primaryUserId, setPrimaryUserId] = useState("");
   const [secondaryUserIds, setSecondaryUserIds] = useState<string[]>([]);
   const [expiresAt, setExpiresAt] = useState("");
+  const [description, setDescription] = useState("");
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit({
+      description: description.trim(),
       currentOwnerId: primaryUserId,
       expiresAt: new Date(expiresAt).toISOString(),
       pocs: [
@@ -65,7 +68,7 @@ export function ReserveModal({
         </p>
         <form className="reserve-form" onSubmit={submit}>
           {error && (
-            <p className="auth-error" role="alert">
+            <p className="auth-error reserve-form-error" role="alert">
               {error}
             </p>
           )}
@@ -108,7 +111,17 @@ export function ReserveModal({
               required
             />
           </label>
-          <div className="modal-actions">
+          <label className="modal-field">
+            <span>Description</span>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              maxLength={1000}
+              required
+              rows={3}
+            />
+          </label>
+          <div className="modal-actions reserve-form-actions">
             <button
               className="secondary-button"
               type="button"
@@ -120,7 +133,10 @@ export function ReserveModal({
               className="primary-button"
               type="submit"
               disabled={
-                isSubmitting || !primaryUserId || secondaryUserIds.length < 1
+                isSubmitting ||
+                !description.trim() ||
+                !primaryUserId ||
+                secondaryUserIds.length < 1
               }
             >
               {isSubmitting ? "Reserving..." : "Create reservation"}

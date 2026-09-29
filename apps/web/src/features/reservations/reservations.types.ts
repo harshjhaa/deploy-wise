@@ -18,6 +18,7 @@ export type ReservationEvent = {
 
 export type ReservationDetail = {
   id: string;
+  description: string;
   environmentId: string;
   gameId: string;
   currentOwnerId: string;

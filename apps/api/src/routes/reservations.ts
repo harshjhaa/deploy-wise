@@ -18,9 +18,12 @@ router.use(requireAuth);
 // Create a new reservation
 router.post('/', async (req, res, next) => {
   try {
-    const { environmentId, gameId, currentOwnerId, expiresAt, pocs } = req.body as any;
-    if (missingBodyFields(req.body, ['environmentId', 'gameId', 'currentOwnerId', 'expiresAt']).length > 0) {
+    const { environmentId, gameId, description, currentOwnerId, expiresAt, pocs } = req.body as any;
+    if (missingBodyFields(req.body, ['environmentId', 'gameId', 'description', 'currentOwnerId', 'expiresAt']).length > 0) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (typeof description !== 'string' || !description.trim()) {
+      return res.status(400).json({ error: 'Description is required' });
     }
 
     const creatorId = req.user!.id;
@@ -67,6 +70,7 @@ router.post('/', async (req, res, next) => {
         data: {
           environmentId,
           gameId,
+          description: description.trim(),
           createdById: creatorId,
           currentOwnerId,
           status: 'ACTIVE',
